@@ -20,6 +20,14 @@ Arguments:
 Options:
   -h, --help      Display this help message and exit.
   -V, --version   Display version information and exit.
+  -p, --progress  Display progress of the run.
+  -v, --verbose   Increase verbosity of messages.
+  -q, --quiet     Do not output any messages or progress.
+
+Exit Codes:
+  0: OK
+  1: Generic/unknown error code
+  2: PHP syntax error code
 ```
 
 Example:

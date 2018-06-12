@@ -5,7 +5,7 @@
 #               with several processes at once.
 # AUTHOR:       Chauncey McAskill <chauncey@mcaskill.ca>
 # DATE:         2018-06-08
-# VERSION:      0.1.0
+# VERSION:      0.2.0
 # LICENSE:      The MIT License (MIT)
 # USAGE:        phplint [options] [<path>]...
 # REPOSITORY:   https://github.com/mcaskill/phplint-bash
@@ -13,7 +13,7 @@
 
 APP_NAME=`basename $0`
 APP_TITLE='PHP Syntax Check'
-APP_VERSION='0.1.0'
+APP_VERSION='0.2.0'
 
 
 
@@ -27,7 +27,49 @@ APP_VERSION='0.1.0'
 #   $@ (required) - One or more paths to files or directories with PHP code.
 #
 function main() {
-    find ${@} \( -type f -name '*.php' \) -print0 2>/dev/null | xargs -0 -n1 -P8 php -l | grep -v '^No syntax errors detected'; test $? -eq 1
+    # Bail early if there are no paths to search
+    if [ ${#DIRS[@]} -eq 0 ]; then
+        if [ ${QUIET} -eq 0 ]; then
+            echo "No file or directory to check."
+        fi
+        exit 1
+    fi
+
+    # Compile list of found files from existing search paths
+    while IFS=  read -r -d $'\0'; do
+        FILES+=("$REPLY")
+    done < <(find ${DIRS[@]} \( -type f -name '*.php' \) -print0 2>/dev/null)
+
+    # Bail early if there are no files to check
+    if [ ${#FILES[@]} -eq 0 ]; then
+        if [ ${QUIET} -eq 0 ]; then
+            if [ ${#ARGS[@]} -eq 0 ]; then
+                echo "0 PHP files found in: $(join ", " ${DIRS[@]})"
+            else
+                echo "0 PHP files found in $(path_count ${#DIRS[@]})."
+            fi
+        fi
+        exit 1
+    fi
+
+    if [ ${VERBOSE} ]; then
+        if [ ${#ARGS[@]} -eq 0 ]; then
+            verbose "Checking $(file_count ${#FILES[@]}) found in: $(join ", " ${DIRS[@]})"
+        else
+            verbose "Checking $(file_count ${#FILES[@]}) found in $(path_count ${#DIRS[@]})..."
+        fi
+    fi
+
+    if (printf "%s\0" "${FILES[@]}" | xargs -0 -n1 -P8 php -l | grep $( (( ${QUIET} == 1 )) && printf %s '-q' ) -v '^No syntax errors detected'); then
+        exit 1
+    fi
+
+    if [ ${QUIET} -eq 0 ]; then
+        verbose ""  # Insert blank line
+        echo "No syntax errors detected"
+    fi
+
+    exit 0
 }
 
 #
@@ -45,6 +87,9 @@ Arguments:
 Options:
   -h, --help      Display this help message and exit.
   -V, --version   Display version information and exit.
+  -p, --progress  Display progress of the run.
+  -v, --verbose   Increase verbosity of messages.
+  -q, --quiet     Do not output any messages or progress.
 "
 }
 
@@ -55,24 +100,141 @@ function show_header() {
     echo "${APP_TITLE} v${APP_VERSION} by Chauncey McAskill"
 }
 
+#
+# Print verbose information.
+#
+# Arguments:
+#    $1 (required) - The message to print.
+#    $2 (optional) - The verbosity level (defaults to 1).
+#
+function verbose() {
+    local LVL=1
+
+    # Validate any provided verbosity level
+    if [[ ${2-} =~ ^[1-3]+$ ]]; then
+        LVL="$1"
+    fi
+
+    if [[ "$VERBOSE" -ge "$LVL" ]]; then
+        echo -e "$1";
+    fi
+}
+
+#
+# Join array elements with a string.
+#
+# Arguments:
+#    $1 (required) - The glue between the strings.
+#    $2 (required) - The array of strings to implode.
+#
+function join() {
+    local GLUE=$1;
+    shift;
+    echo -n "$1";
+    shift;
+    printf "%s" "${@/#/$GLUE}";
+}
+
+#
+# Print Search Path Count
+#
+# Arguments:
+#    $1 (required) - The number of paths to search.
+#
+function path_count() {
+    if [ $1 -eq 1 ]; then
+        echo "1 path"
+    else
+        echo "$1 paths"
+    fi
+}
+
+#
+# Print PHP File Count
+#
+# Arguments:
+#    $1 (required) - The number of files found.
+#
+function file_count() {
+    if [ $1 -eq 1 ]; then
+        echo "1 PHP file"
+    else
+        echo "$1 PHP files"
+    fi
+}
 
 
-# Help
+
+# Set Flags
 # ------------------------------------------------
 
-if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
-    show_usage >&2;
-    exit 0
-fi
+QUIET=0       # Whether to NOT output to standard output
+PROGRESS=0    # Whether to output progress of the run
+VERBOSE=0     # Whether to output more information
+ARGS=()       # Remaining arguments
+DIRS=()       # Paths to search
+FILES=()      # Found files to check
 
 
 
-# Version
+# Parse Arguments
 # ------------------------------------------------
 
-if [ "$1" == "-V" ] || [ "$1" == "--version" ]; then
-    show_header >&2;
-    exit 0
+while [[ $1 = -?* ]]; do
+    case $1 in
+        -h|--help)
+            show_usage >&2;
+            exit 0
+            ;;
+
+        -V|--version)
+            show_header >&2;
+            exit 0
+            ;;
+
+        -p|--progress)
+            PROGRESS=1
+            ;;
+
+        -vvv|--verbose)
+            VERBOSE=3
+            ;;
+
+        -vv)
+            VERBOSE=2
+            ;;
+
+        -v)
+            VERBOSE=1
+            ;;
+
+        -q|--quiet)
+            QUIET=1
+            ;;
+
+        # --endopts)
+        #     shift;
+        #     break
+        #     ;;
+
+        *)
+            echo "Invalid Option: '$1'" 1>&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# Store the remaining part as arguments
+ARGS+=(${@})
+
+# Presume the remaining part are paths to search
+DIRS+=(${@})
+
+# Resolve verbosity and progress
+if [ ${QUIET} -ne 0 ]; then
+    PROGRESS=0
+    VERBOSE=0
 fi
 
 
