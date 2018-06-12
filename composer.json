@@ -1,0 +1,23 @@
+{
+    "type": "library",
+    "name": "mcaskill/phplint-bash",
+    "description": "A bash script to recursively lint PHP files with a nice output.",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Chauncey McAskill",
+            "homepage": "https://mcaskill.ca"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "extra": {
+        "branch-alias": {
+            "dev-master": "0.1.x-dev"
+        }
+    },
+    "require": {
+        "php": ">=5.6.0"
+    },
+    "bin": [ "bin/phplint" ]
+}
