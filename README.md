@@ -8,6 +8,26 @@ A bash wrapper around `php -l` to recursively perform syntax checks on PHP files
 $ composer require mcaskill/phplint-bash
 ```
 
+## Usage
+
+```
+Usage:
+  phplint [options] [<path>]...
+
+Arguments:
+  path            One or more paths to files or directories to search for PHP files.
+
+Options:
+  -h, --help      Display this help message and exit.
+  -V, --version   Display version information and exit.
+```
+
+Example:
+
+```
+$ phplint src/Http/Controllers/ src/Providers/RouteServiceProvider.php
+```
+
 ## License
 
 This is licensed under MIT.
